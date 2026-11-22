@@ -1,5 +1,5 @@
 
-name: Build dirtyInit (ARM64)
+name: Build APK (ARM64)
 
 on:
   push:
