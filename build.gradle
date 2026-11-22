@@ -1,0 +1,19 @@
+// Top-level build file. AGP 7.4.2 is pinned on purpose: it builds the
+// upstream AndroidManifest.xml (package= attribute) untouched. AGP 8 would
+// require migrating the manifest to the namespace/version DSL.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
