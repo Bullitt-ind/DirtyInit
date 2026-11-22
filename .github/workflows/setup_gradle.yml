@@ -1,0 +1,55 @@
+
+name: Generate Gradle Wrapper
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-wrapper:
+    name: Generate Gradle 7.6.4 Wrapper
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle 7.6.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.6.4'
+
+      - name: Generate Gradle Wrapper
+        run: |
+          gradle wrapper \
+            --gradle-version 7.6.4 \
+            --distribution-type bin
+
+      - name: Show generated files
+        run: |
+          ls -lh gradlew
+          ls -lh gradlew.bat
+          ls -lh gradle/wrapper/
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Commit and push wrapper
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Generate Gradle 7.6.4 wrapper"
+          file_pattern: |
+            gradlew
+            gradlew.bat
+            gradle/wrapper/gradle-wrapper.jar
+            gradle/wrapper/gradle-wrapper.properties
