@@ -1,0 +1,108 @@
+
+name: Build dirtyInit (ARM64)
+
+on:
+  push:
+    branches: [ main, master, dev ]
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-arm64:
+    name: Build Android ARM64 APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r26d
+
+      - name: Show toolchain
+        run: |
+          NDK="${{ steps.ndk.outputs.ndk-path }}"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" --version
+
+      - name: Compile ARM64 static binary
+        run: |
+          NDK="${{ steps.ndk.outputs.ndk-path }}"
+          CLANG="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+
+          if [ ! -x "$CLANG" ]; then
+            echo "ERROR: clang not found at $CLANG"
+            ls "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/" | grep aarch64 || true
+            exit 1
+          fi
+
+          "$CLANG" -static -O2 \
+            -include stdarg.h -include strings.h \
+            -Wno-unused-parameter \
+            -Wno-unused-variable \
+            -Wno-unused-but-set-variable \
+            -o dirtyinit native/dirtyinit.c
+
+          file dirtyinit
+          ls -lh dirtyinit
+          sha256sum dirtyinit
+
+      - name: Copy dirtyInit into Android assets
+        run: |
+          mkdir -p app/src/main/assets
+          cp dirtyinit app/src/main/assets/dirtyinit
+          ls -lh app/src/main/assets/dirtyinit
+
+      - name: Install e2fsprogs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y e2fsprogs
+
+      - name: Generate ext4 save-state image
+        run: |
+          mke2fs -t ext4 -F -b 4096 \
+            -O ^casefold,^encrypt \
+            overlay_scratch.img 16384
+
+          cp overlay_scratch.img app/src/main/assets/
+
+          ls -lh app/src/main/assets/overlay_scratch.img
+          file app/src/main/assets/overlay_scratch.img
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dirtyinit-android-arm64
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: dirtyInit ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
